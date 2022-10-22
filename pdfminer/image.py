@@ -20,6 +20,7 @@ from .pdftypes import (
     LITERALS_JBIG2_DECODE,
     LITERALS_JPX_DECODE,
     LITERALS_FLATE_DECODE,
+    PDFObjRef,
 )
 
 PIL_ERROR_MESSAGE = (
@@ -117,8 +118,11 @@ class ImageWriter:
             name = self._save_bmp(image, width, height, (width + 7) // 8, image.bits)
 
         elif image.bits == 8 and LITERAL_DEVICE_RGB in image.colorspace:
-            name = self._save_bmp(image, width, height, width * 3, image.bits * 3)
-
+            if len(filters) == 1 and filters[0][0] in LITERALS_FLATE_DECODE:
+                name = self._save_bytes(image)
+            else:
+                name = self._save_bmp(image, width, height, width * 3, image.bits * 3)
+            
         elif image.bits == 8 and LITERAL_DEVICE_GRAY in image.colorspace:
             name = self._save_bmp(image, width, height, width, image.bits)
 
@@ -222,23 +226,30 @@ class ImageWriter:
         name, path = self._create_unique_image_name(image, ".jpg")
         width, height = image.srcsize
         channels = len(image.stream.get_data()) / width / height / (image.bits / 8)
+        try:
+            from PIL import Image  # type: ignore[import]
+        except ImportError:
+            raise ImportError(PIL_ERROR_MESSAGE)
+
+        mode: Literal["1", "8", "RGB", "CMYK", "I;16", "P"]
+        if image.bits == 1:
+            mode = "1"
+        elif image.bits == 8 and channels == 1:
+            mode = "8"
+            if isinstance(image.colorspace, list) and len(image.colorspace) == 1 and  isinstance(image.colorspace[0], PDFObjRef):
+                name, path = self._create_unique_image_name(image, ".png")
+                mode = 'P'
+            
+        elif image.bits == 8 and channels == 3:
+            mode = "RGB"
+        elif image.bits == 8 and channels == 4:
+            mode = "CMYK"
+        else:
+            mode = "I;16"
+            name, path = self._create_unique_image_name(image, ".png")
+
+        img = Image.frombytes(mode, image.srcsize, image.stream.get_data(), "raw")
         with open(path, "wb") as fp:
-            try:
-                from PIL import Image  # type: ignore[import]
-            except ImportError:
-                raise ImportError(PIL_ERROR_MESSAGE)
-
-            mode: Literal["1", "8", "RGB", "CMYK"]
-            if image.bits == 1:
-                mode = "1"
-            elif image.bits == 8 and channels == 1:
-                mode = "8"
-            elif image.bits == 8 and channels == 3:
-                mode = "RGB"
-            elif image.bits == 8 and channels == 4:
-                mode = "CMYK"
-
-            img = Image.frombytes(mode, image.srcsize, image.stream.get_data(), "raw")
             img.save(fp)
 
         return name

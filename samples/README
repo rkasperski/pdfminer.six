@@ -69,3 +69,6 @@ cpdf -encrypt AES foo baz base.pdf -o aes-128.pdf
 cpdf -encrypt AES foo baz base.pdf -no-encrypt-metadata -o aes-128-m.pdf
 cpdf -encrypt AES256 foo baz base.pdf -o aes-256.pdf
 cpdf -encrypt AES256 foo baz base.pdf -no-encrypt-metadata -o aes-256-m.pdf
+
+-- files in the html2pdf folder are generated using IOS 15 to save web pages as pdf
+copyright of these pages remains with the owner of the website.
